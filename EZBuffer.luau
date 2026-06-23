@@ -9,7 +9,7 @@ local HttpService = game:GetService("HttpService")
 local Main = {}
 
 -- Give a string as an argument. [[december]]
-function Main.EncodeString(stringInput:string)
+function Main.EncodeString(stringInput:string):buffer
 	local newBuffer = buffer.create(stringInput:len() + 1)
 	buffer.writestring(newBuffer, 0, stringInput)
 	
@@ -17,14 +17,14 @@ function Main.EncodeString(stringInput:string)
 end
 
 -- Give a buffer containing a string as an argument. [[december]]
-function Main.DecodeString(bufferContainingString:buffer)
+function Main.DecodeString(bufferContainingString:buffer):string
 	local output = buffer.readstring(bufferContainingString, 0, buffer.len(bufferContainingString))
 	
 	return output
 end
 
 -- Give a table as an argument. [[december]]
-function Main.EncodeTable(tableData)
+function Main.EncodeTable(tableData):buffer
 	--[[
 	there are possibly better ways to do it rather than using JSONEncode and shit but i wasnt really
 	able to find anything that wasnt just true doohickey bullshit plus this does work for now without
@@ -64,23 +64,72 @@ function Main.determineBitFunction(bitAmount:number, write:boolean)
 	return functionToReturn
 end
 
--- Turns the number you input with a signed buffer with the amount of bits you give with automatic buffer size determining. [[december]]
-function Main.EncodeNumber(numberInput:number, bitAmount:number?)
-	bitAmount = (bitAmount or 32)
+-- Determines the buffer size for numbers automatically. [[december]]
+function Main.determineBufferSizeNumber(bitAmount:number):number
+	local sizeToReturn:number = 4
+	
+	if bitAmount == 8 then
+		sizeToReturn = 1
+	elseif bitAmount == 16 then
+		sizeToReturn = 2
+	elseif bitAmount == 32 then
+		sizeToReturn = 4
+	else
+		sizeToReturn = 8
+	end
+	
+	return sizeToReturn
+end
+
+function Main.determineBitAmount(numberInput:number):number
+	local bitAmount:number = 32
+	
+	if numberInput >= -128 and numberInput <= 127 then
+		bitAmount = 8
+		
+		return bitAmount
+	end
+	
+	if numberInput >= -32768 and numberInput <= 32767 then
+		bitAmount = 16
+		
+		return bitAmount
+	end
+	
+	if numberInput >= -2147483648 and numberInput <= 2147483647 then
+		bitAmount = 32
+		
+		return bitAmount
+	end
+	
+	bitAmount = 64
+	
+	return bitAmount
+end
+
+--[[
+	Turns the number you input with a signed buffer with the amount of bits you give with automatic buffer size determining.
+	If you didn't give a bit amount, its recommended to send an 8-bit buffer containing the bit amount if youre sending this
+	over networking.
+	The function will return a bit the bit amount as well as the buffer.
+	(december)
+]]
+function Main.EncodeNumber(numberInput:number, bitAmount:number?):(buffer, number)
+	bitAmount = (bitAmount or Main.determineBitAmount(numberInput))
 	
 	local bufferWriteFunction = Main.determineBitFunction(bitAmount, true)
 	
-	local bufferSize = tostring(numberInput):len()
+	local bufferSize = Main.determineBufferSizeNumber(bitAmount)
 	local newBuffer = buffer.create(bufferSize)
 	
 	-- dont mind that its erroring out [[december]]
 	bufferWriteFunction(newBuffer, 0, numberInput)
 	
-	return newBuffer
+	return newBuffer, bitAmount
 end
 
 -- Decodes the signed buffer with numbers inside of it with the amount of bits it was created with. [[december]]
-function Main.DecodeNumber(bufferContainingNumber:buffer, bitNumber:number)
+function Main.DecodeNumber(bufferContainingNumber:buffer, bitNumber:number):number
 	local bitFunction = Main.determineBitFunction(bitNumber, false)
 	
 	-- dont mind that its erroring out [[december]]
